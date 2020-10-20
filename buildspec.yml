@@ -1,0 +1,29 @@
+version : 0.2
+
+phases :
+    # Docerのランタイム指定
+    install :
+        runtime-versions :
+            docker : 18
+    pre_build :
+        commands :
+            # ECRにログイン
+            - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+            # ECRのリポジトリ取得
+            - $REPO=$(aws ecr describe-repositories --repository-names example --query "repositories[0].repositoryUri" --output text)
+            # イメージ名
+            - IMAGE=$REPO:latest
+    build :
+        commands :
+            # ビルド
+            - docker build -t $IMAGE .
+            # ECRにプッシュ
+            - docker push $IMAGE
+    post_build :
+        commands :
+            # codedeployで使用するimegedefinitions.jsonを生成する。
+            # nameで指定したコンテナをimageUriに指定したイメージで更新する。
+            # %s に　＄IMAGEの値を代入している。
+            - printf '[{"name":"example","imageUri":"%s"}]' $IMAGE > imagedefinitions.json
+    artifacts:
+        files : imagedefinitions.json
